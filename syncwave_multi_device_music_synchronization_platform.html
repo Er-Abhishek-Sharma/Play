@@ -1,0 +1,1938 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SyncWave — Multi-Device Synchronized Music Platform</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons CDN -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- QRCode.js CDN for room sharing -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              purple: '#7c3aed',
+              pink: '#ec4899',
+              blue: '#3b82f6',
+              cyan: '#06b6d4',
+              dark: '#0b0d19',
+              card: '#13182c',
+              border: '#232946'
+            }
+          },
+          animation: {
+            'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            'spin-slow': 'spin 12s linear infinite',
+            'glow': 'glow 2s ease-in-out infinite alternate',
+          },
+          keyframes: {
+            glow: {
+              '0%': { boxShadow: '0 0 10px rgba(124, 58, 237, 0.4)' },
+              '100%': { boxShadow: '0 0 25px rgba(236, 72, 153, 0.7)' }
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0b0d19;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #232946;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #7c3aed;
+    }
+
+    /* Glassmorphism Classes */
+    .glass-panel {
+      background: rgba(19, 24, 44, 0.75);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .glass-card {
+      background: rgba(26, 32, 59, 0.6);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .stage-grid {
+      background-size: 30px 30px;
+      background-image: 
+        linear-gradient(to right, rgba(124, 58, 237, 0.07) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(124, 58, 237, 0.07) 1px, transparent 1px);
+    }
+  </style>
+</head>
+
+<body class="bg-brand-dark text-slate-100 font-sans min-h-screen flex flex-col antialiased selection:bg-brand-pink selection:text-white">
+
+  <header class="h-16 border-b border-brand-border glass-panel sticky top-0 z-40 px-4 md:px-6 flex items-center justify-between">
+    <!-- Brand Logo -->
+    <div class="flex items-center space-x-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-purple via-brand-pink to-brand-blue flex items-center justify-center shadow-lg shadow-brand-purple/30 animate-pulse-slow">
+        <i class="fa-solid fa-tower-broadcast text-white text-lg"></i>
+      </div>
+      <div>
+        <div class="flex items-center space-x-2">
+          <span class="font-extrabold text-xl tracking-tight bg-gradient-to-r from-purple-400 via-pink-400 to-cyan-400 bg-clip-text text-transparent">SyncWave</span>
+          <span class="text-[10px] uppercase font-bold tracking-widest px-1.5 py-0.5 rounded bg-brand-purple/20 text-purple-300 border border-brand-purple/30">NTP Engine</span>
+        </div>
+        <p class="text-[11px] text-slate-400 hidden sm:block">Multi-Device Wireless Speaker Synchronization</p>
+      </div>
+    </div>
+
+    <!-- Active Room Badge & Controls -->
+    <div class="flex items-center space-x-2 md:space-x-4">
+      <!-- Sync Status Pill -->
+      <div id="sync-status-pill" class="flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-950/60 border border-emerald-500/30 text-emerald-400 text-xs font-semibold">
+        <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping inline-block"></span>
+        <span id="sync-status-text">🟢 Synced (±2ms)</span>
+      </div>
+
+      <!-- Room Code Pill with Share -->
+      <button onclick="toggleModal('room-modal')" class="flex items-center space-x-2 px-3.5 py-1.5 rounded-lg bg-brand-card hover:bg-slate-800 border border-brand-border text-sm font-medium transition duration-200">
+        <i class="fa-solid fa-door-open text-brand-pink"></i>
+        <span class="text-slate-400">Room:</span>
+        <span id="nav-room-id" class="font-mono text-purple-300 font-bold">#810582</span>
+      </button>
+
+      <!-- Architecture Inspector Button -->
+      <button onclick="toggleModal('arch-modal')" class="px-3 py-1.5 rounded-lg bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/40 text-indigo-300 text-xs font-semibold flex items-center space-x-1.5 transition">
+        <i class="fa-solid fa-cubes-stacked"></i>
+        <span class="hidden md:inline">Django / Channels Architecture</span>
+      </button>
+
+      <!-- Audio Permission Unlock Banner -->
+      <button id="unlock-audio-btn" onclick="unlockAudioContext()" class="px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-xs font-bold shadow-lg shadow-orange-500/20 flex items-center space-x-2 animate-bounce">
+        <i class="fa-solid fa-volume-high"></i>
+        <span>Enable Audio</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="flex-1 flex flex-col md:flex-row overflow-hidden">
+    
+    <!-- Sidebar Navigation for Desktop -->
+    <aside class="w-full md:w-64 glass-panel border-r border-brand-border p-4 flex md:flex-col justify-between overflow-x-auto md:overflow-y-auto shrink-0">
+      <div class="flex md:flex-col space-x-2 md:space-x-0 md:space-y-1.5 w-full">
+        <button onclick="switchTab('player-stage')" class="tab-btn active w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-white bg-brand-purple/30 border border-brand-purple/40">
+          <i class="fa-solid fa-circle-play text-brand-pink w-5 text-center"></i>
+          <span>Player & Stage</span>
+        </button>
+
+        <button onclick="switchTab('devices')" class="tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-400 hover:text-white hover:bg-slate-800/50">
+          <div class="flex items-center space-x-3">
+            <i class="fa-solid fa-mobile-screen-button text-cyan-400 w-5 text-center"></i>
+            <span>Connected Devices</span>
+          </div>
+          <span id="sidebar-device-count" class="px-2 py-0.5 rounded-full text-xs bg-slate-800 text-slate-300 font-bold">5</span>
+        </button>
+
+        <button onclick="switchTab('queue')" class="tab-btn w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-400 hover:text-white hover:bg-slate-800/50">
+          <div class="flex items-center space-x-3">
+            <i class="fa-solid fa-list-music text-purple-400 w-5 text-center"></i>
+            <span>Collaborative Queue</span>
+          </div>
+          <span id="sidebar-queue-count" class="px-2 py-0.5 rounded-full text-xs bg-brand-purple/30 text-purple-300 font-bold">4</span>
+        </button>
+
+        <button onclick="switchTab('library')" class="tab-btn w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-400 hover:text-white hover:bg-slate-800/50">
+          <i class="fa-solid fa-folder-music text-amber-400 w-5 text-center"></i>
+          <span>Library & Uploads</span>
+        </button>
+
+        <button onclick="switchTab('youtube')" class="tab-btn w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-400 hover:text-white hover:bg-slate-800/50">
+          <i class="fa-brands fa-youtube text-red-400 w-5 text-center"></i>
+          <span>YouTube Stream</span>
+        </button>
+
+        <button onclick="switchTab('settings')" class="tab-btn w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition text-slate-400 hover:text-white hover:bg-slate-800/50">
+          <i class="fa-solid fa-sliders text-emerald-400 w-5 text-center"></i>
+          <span>Latency & Calibrate</span>
+        </button>
+      </div>
+
+      <!-- Quick Room Switcher Card -->
+      <div class="hidden md:block mt-6 p-3.5 rounded-xl glass-card border border-brand-border/60">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs uppercase font-bold text-slate-400 tracking-wider">Device ID</span>
+          <span class="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 font-mono" id="current-device-role">HOST</span>
+        </div>
+        <p id="local-device-name" class="text-sm font-semibold text-white truncate">💻 Abhishek's Laptop (This Device)</p>
+        <div class="mt-3 flex items-center justify-between text-xs text-slate-400">
+          <span>Clock Offset:</span>
+          <span id="debug-clock-offset" class="font-mono text-emerald-400">+1.24 ms</span>
+        </div>
+        <div class="mt-1 flex items-center justify-between text-xs text-slate-400">
+          <span>Hardware Delay:</span>
+          <span id="debug-hw-delay" class="font-mono text-cyan-400">+25 ms</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Dynamic Content Workspace -->
+    <div class="flex-1 flex flex-col overflow-y-auto bg-brand-dark/95">
+
+      <!-- ================= TAB 1: PLAYER & SPATIAL AUDIO STAGE ================= -->
+      <section id="tab-player-stage" class="tab-content flex-1 p-4 md:p-6 flex flex-col space-y-6">
+        
+        <!-- Top Row: Modern Player & Visualizer -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+          
+          <!-- Track & Artwork Card -->
+          <div class="lg:col-span-5 glass-panel rounded-2xl p-5 border border-brand-border flex flex-col justify-between relative overflow-hidden shadow-2xl">
+            <div class="absolute -top-16 -right-16 w-44 h-44 bg-brand-purple/20 rounded-full blur-3xl pointer-events-none"></div>
+            
+            <div class="flex items-center space-x-4">
+              <!-- Vinyl Spinning Artwork -->
+              <div class="relative w-24 h-24 rounded-2xl overflow-hidden shrink-0 border border-brand-purple/40 shadow-lg shadow-brand-purple/20">
+                <img id="player-artwork" src="https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=400&auto=format&fit=crop&q=80" alt="Album Art" class="w-full h-full object-cover transition-transform duration-700 ease-linear">
+                <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+                <div class="absolute bottom-1.5 left-2 flex items-center space-x-1">
+                  <span class="w-1.5 h-3 bg-brand-pink rounded-full animate-bounce"></span>
+                  <span class="w-1.5 h-5 bg-brand-purple rounded-full animate-bounce delay-100"></span>
+                  <span class="w-1.5 h-2 bg-brand-cyan rounded-full animate-bounce delay-200"></span>
+                </div>
+              </div>
+
+              <!-- Song Details -->
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center space-x-2">
+                  <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-brand-pink/20 text-pink-300 border border-brand-pink/30 uppercase">Synced Stream</span>
+                  <span id="player-genre" class="text-xs text-slate-400">Synthwave / EDM</span>
+                </div>
+                <h2 id="player-title" class="text-xl font-bold text-white truncate mt-1">Blinding Lights (SyncWave Remaster)</h2>
+                <p id="player-artist" class="text-sm text-slate-300 truncate">The Weeknd • Synth Orchestra</p>
+                <div class="flex items-center space-x-3 mt-2 text-xs text-slate-400">
+                  <span><i class="fa-solid fa-users text-brand-purple mr-1"></i> <span id="player-listeners">5 Devices</span></span>
+                  <span><i class="fa-solid fa-signal text-emerald-400 mr-1"></i> 320 kbps / 48kHz</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Progress Bar -->
+            <div class="mt-5">
+              <div class="flex justify-between text-xs font-mono text-slate-400 mb-1">
+                <span id="current-time-display">0:00</span>
+                <span id="duration-display">3:24</span>
+              </div>
+              <div id="progress-bar-container" onclick="handleSeekClick(event)" class="w-full h-2.5 bg-slate-800 rounded-full cursor-pointer relative overflow-hidden group">
+                <div id="progress-fill" class="h-full bg-gradient-to-r from-brand-purple via-brand-pink to-brand-cyan rounded-full w-0 transition-all duration-100 relative">
+                  <div class="absolute right-0 top-1/2 -translate-y-1/2 w-3.5 h-3.5 bg-white rounded-full shadow opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Transport Playback Controls -->
+            <div class="mt-4 flex items-center justify-between">
+              <div class="flex items-center space-x-3">
+                <button onclick="toggleShuffle()" id="shuffle-btn" class="text-slate-400 hover:text-white text-sm transition" title="Shuffle"><i class="fa-solid fa-shuffle"></i></button>
+                <button onclick="playPrevTrack()" class="text-slate-300 hover:text-white text-lg transition" title="Previous Track"><i class="fa-solid fa-backward-step"></i></button>
+              </div>
+
+              <!-- Main Play/Pause Button -->
+              <div class="flex items-center space-x-4">
+                <button id="master-play-btn" onclick="togglePlayPauseMaster()" class="w-14 h-14 rounded-full bg-gradient-to-tr from-brand-purple to-brand-pink hover:from-purple-500 hover:to-pink-500 flex items-center justify-center text-white text-xl shadow-lg shadow-brand-pink/30 transform hover:scale-105 active:scale-95 transition">
+                  <i id="master-play-icon" class="fa-solid fa-play ml-0.5"></i>
+                </button>
+              </div>
+
+              <div class="flex items-center space-x-3">
+                <button onclick="playNextTrack()" class="text-slate-300 hover:text-white text-lg transition" title="Next Track"><i class="fa-solid fa-forward-step"></i></button>
+                <button onclick="toggleRepeat()" id="repeat-btn" class="text-slate-400 hover:text-white text-sm transition" title="Repeat"><i class="fa-solid fa-repeat"></i></button>
+              </div>
+            </div>
+
+            <!-- Master Volume Slider -->
+            <div class="mt-4 flex items-center space-x-3 pt-3 border-t border-brand-border/60">
+              <button onclick="toggleMuteMaster()" class="text-slate-400 hover:text-white text-sm">
+                <i id="volume-icon" class="fa-solid fa-volume-high"></i>
+              </button>
+              <input type="range" id="master-volume-slider" min="0" max="1" step="0.01" value="0.85" oninput="adjustMasterVolume(this.value)" class="flex-1 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-brand-pink">
+              <span id="master-volume-label" class="text-xs font-mono text-slate-400 w-9 text-right">85%</span>
+            </div>
+          </div>
+
+          <!-- Web Audio API Realtime Frequency Visualizer -->
+          <div class="lg:col-span-7 glass-panel rounded-2xl p-5 border border-brand-border flex flex-col justify-between relative overflow-hidden shadow-2xl">
+            <div class="flex items-center justify-between mb-2">
+              <div class="flex items-center space-x-2">
+                <i class="fa-solid fa-chart-simple text-cyan-400"></i>
+                <h3 class="text-sm font-bold tracking-wide uppercase text-slate-300">Web Audio API Frequency Spectrum</h3>
+              </div>
+              <div class="flex items-center space-x-2">
+                <span class="text-[11px] text-slate-400 font-mono">FFT: 128 Bins</span>
+                <span class="px-2 py-0.5 rounded bg-brand-border text-slate-300 text-[11px] font-mono" id="visualizer-fps">60 FPS</span>
+              </div>
+            </div>
+
+            <!-- Responsive Visualizer Canvas -->
+            <div class="relative w-full h-44 md:h-52 bg-slate-950/70 rounded-xl overflow-hidden border border-brand-border/70 flex items-center justify-center">
+              <canvas id="visualizer-canvas" class="w-full h-full block"></canvas>
+              <!-- Center notification if audio not running -->
+              <div id="visualizer-overlay" class="absolute inset-0 flex flex-col items-center justify-center bg-black/40 backdrop-blur-[2px] transition-opacity">
+                <p class="text-xs text-slate-300 font-medium">Click "Play" or "Enable Audio" to start real-time synthesis & visualizer</p>
+              </div>
+            </div>
+
+            <!-- Real-time Synchronization Health Bar -->
+            <div class="mt-4 grid grid-cols-3 gap-3 text-center">
+              <div class="p-2.5 rounded-xl bg-slate-900/60 border border-brand-border">
+                <div class="text-[10px] text-slate-400 uppercase font-semibold">Client-Server Drift</div>
+                <div id="metric-drift" class="text-sm font-mono font-bold text-emerald-400">+0.8 ms</div>
+              </div>
+              <div class="p-2.5 rounded-xl bg-slate-900/60 border border-brand-border">
+                <div class="text-[10px] text-slate-400 uppercase font-semibold">Target Timestamp</div>
+                <div id="metric-timestamp" class="text-sm font-mono font-bold text-purple-300">T + 1200ms</div>
+              </div>
+              <div class="p-2.5 rounded-xl bg-slate-900/60 border border-brand-border">
+                <div class="text-[10px] text-slate-400 uppercase font-semibold">Network Jitter</div>
+                <div id="metric-jitter" class="text-sm font-mono font-bold text-cyan-400">1.4 ms</div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Interactive 2D Spatial Audio Stage -->
+        <div class="glass-panel rounded-2xl p-5 border border-brand-border flex flex-col relative overflow-hidden shadow-2xl">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+            <div>
+              <div class="flex items-center space-x-2">
+                <h3 class="text-base font-bold text-white flex items-center space-x-2">
+                  <i class="fa-solid fa-vr-cardboard text-brand-pink"></i>
+                  <span>Interactive Virtual Spatial Audio Stage</span>
+                </h3>
+                <span class="text-xs px-2 py-0.5 rounded-full bg-brand-purple/20 text-purple-300 border border-brand-purple/40">2D Panner & Attenuation</span>
+              </div>
+              <p class="text-xs text-slate-400 mt-0.5">Drag devices closer to the central audio source for louder volume, or left/right for stereo panning.</p>
+            </div>
+
+            <!-- Spatial Audio Toggle -->
+            <div class="flex items-center space-x-3">
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" id="spatial-toggle" checked onchange="toggleSpatialAudio(this.checked)" class="sr-only peer">
+                <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-purple"></div>
+                <span class="ml-2 text-xs font-semibold text-slate-300">Spatial Sound Active</span>
+              </label>
+              <button onclick="resetStagePositions()" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition border border-brand-border">
+                <i class="fa-solid fa-arrow-rotate-left mr-1"></i> Reset Stage
+              </button>
+            </div>
+          </div>
+
+          <!-- The Interactive Virtual Stage Arena -->
+          <div id="spatial-stage" class="stage-grid relative w-full h-80 bg-slate-950/90 rounded-xl border border-brand-border overflow-hidden select-none cursor-crosshair">
+            
+            <!-- Central Audio Origin (The Virtual Speaker) -->
+            <div id="stage-source" class="absolute w-16 h-16 -ml-8 -mt-8 rounded-full bg-gradient-to-tr from-brand-purple to-brand-pink flex flex-col items-center justify-center text-white shadow-2xl shadow-brand-pink/50 border-2 border-white pointer-events-none transition-transform duration-75" style="left: 50%; top: 50%;">
+              <i class="fa-solid fa-music text-xl animate-pulse"></i>
+              <span class="text-[9px] font-extrabold uppercase mt-0.5">Source</span>
+              <!-- Concentric soundwave circles -->
+              <div class="absolute -inset-6 rounded-full border border-brand-pink/30 animate-ping pointer-events-none"></div>
+              <div class="absolute -inset-14 rounded-full border border-brand-purple/20 pointer-events-none"></div>
+            </div>
+
+            <!-- Stereo panning labels -->
+            <span class="absolute left-3 top-3 text-[11px] font-bold uppercase tracking-widest text-slate-500 pointer-events-none"><i class="fa-solid fa-arrow-left"></i> Left Channel</span>
+            <span class="absolute right-3 top-3 text-[11px] font-bold uppercase tracking-widest text-slate-500 pointer-events-none">Right Channel <i class="fa-solid fa-arrow-right"></i></span>
+            <span class="absolute bottom-2 left-1/2 -translate-x-1/2 text-[10px] text-slate-500 font-mono pointer-events-none">Room Coordinates: ±250m Virtual Space</span>
+
+            <!-- Rendered Drag-and-Drop Virtual Devices (Populated dynamically) -->
+            <div id="stage-devices-container"></div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ================= TAB 2: CONNECTED DEVICES ================= -->
+      <section id="tab-devices" class="tab-content hidden flex-1 p-4 md:p-6 flex flex-col space-y-6">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 class="text-xl font-bold text-white flex items-center space-x-2">
+              <i class="fa-solid fa-mobile-screen-button text-cyan-400"></i>
+              <span>Connected Synchronized Devices</span>
+            </h2>
+            <p class="text-xs text-slate-400 mt-0.5">All devices currently connected to Room <strong class="text-purple-300 font-mono">#810582</strong> receiving timestamped playback instructions.</p>
+          </div>
+          <div class="flex items-center space-x-3">
+            <button onclick="broadcastPingAll()" class="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 text-xs font-semibold border border-brand-border flex items-center space-x-2 transition">
+              <i class="fa-solid fa-wave-pulse"></i>
+              <span>Ping All Devices</span>
+            </button>
+            <button onclick="simulateAddDevice()" class="px-3.5 py-1.5 rounded-xl bg-brand-purple hover:bg-purple-600 text-white text-xs font-semibold shadow-lg shadow-brand-purple/20 flex items-center space-x-2 transition">
+              <i class="fa-solid fa-plus"></i>
+              <span>Simulate Peer Join</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Device Cards Grid -->
+        <div id="devices-grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          <!-- Populated by JavaScript -->
+        </div>
+      </section>
+
+      <!-- ================= TAB 3: COLLABORATIVE QUEUE ================= -->
+      <section id="tab-queue" class="tab-content hidden flex-1 p-4 md:p-6 flex flex-col space-y-6">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 class="text-xl font-bold text-white flex items-center space-x-2">
+              <i class="fa-solid fa-list-music text-purple-400"></i>
+              <span>Collaborative Room Queue</span>
+            </h2>
+            <p class="text-xs text-slate-400 mt-0.5">Connected guests can upvote or add tracks to the synchronized playlist.</p>
+          </div>
+          <div class="flex items-center space-x-3">
+            <button onclick="openAddTrackModal()" class="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-brand-purple to-brand-pink text-white text-xs font-semibold shadow-lg flex items-center space-x-2">
+              <i class="fa-solid fa-plus"></i>
+              <span>Add Track to Queue</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Queue Track List Container -->
+        <div class="glass-panel rounded-2xl border border-brand-border overflow-hidden">
+          <div class="p-4 border-b border-brand-border flex items-center justify-between text-xs text-slate-400 font-semibold uppercase tracking-wider">
+            <div class="w-10">#</div>
+            <div class="flex-1">Track Title & Artist</div>
+            <div class="hidden sm:block w-32 text-center">Added By</div>
+            <div class="w-24 text-center">Votes</div>
+            <div class="w-24 text-right">Actions</div>
+          </div>
+          <div id="queue-list" class="divide-y divide-brand-border/40">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= TAB 4: LIBRARY & UPLOADS ================= -->
+      <section id="tab-library" class="tab-content hidden flex-1 p-4 md:p-6 flex flex-col space-y-6">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 class="text-xl font-bold text-white flex items-center space-x-2">
+              <i class="fa-solid fa-folder-music text-amber-400"></i>
+              <span>Personal Music Library & Uploads</span>
+            </h2>
+            <p class="text-xs text-slate-400 mt-0.5">Uploaded local files (MP3, WAV, FLAC, OGG) stored in Django media storage for synchronized playback.</p>
+          </div>
+          <!-- Upload audio input -->
+          <div>
+            <label class="cursor-pointer px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 text-xs font-semibold border border-amber-400/30 flex items-center space-x-2 transition">
+              <i class="fa-solid fa-cloud-arrow-up"></i>
+              <span>Upload Audio File</span>
+              <input type="file" id="local-file-uploader" accept="audio/*" class="hidden" onchange="handleAudioFileUpload(event)">
+            </label>
+          </div>
+        </div>
+
+        <!-- Sample tracks library cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" id="library-grid">
+          <!-- Populated with built-in procedural synthesizer songs -->
+        </div>
+      </section>
+
+      <!-- ================= TAB 5: YOUTUBE IMPORTER ================= -->
+      <section id="tab-youtube" class="tab-content hidden flex-1 p-4 md:p-6 flex flex-col space-y-6">
+        <div class="glass-panel rounded-2xl p-6 border border-brand-border">
+          <div class="flex items-center space-x-3 mb-3">
+            <div class="w-10 h-10 rounded-xl bg-red-600/20 border border-red-500/40 flex items-center justify-center text-red-500 text-lg">
+              <i class="fa-brands fa-youtube"></i>
+            </div>
+            <div>
+              <h2 class="text-lg font-bold text-white">YouTube IFrame / Timestamp Sync</h2>
+              <p class="text-xs text-slate-400">Synchronize YouTube streams across all connected screens compliant with YouTube API policies.</p>
+            </div>
+          </div>
+
+          <div class="flex flex-col sm:flex-row gap-3 mt-4">
+            <div class="relative flex-1">
+              <i class="fa-solid fa-link absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+              <input type="text" id="yt-url-input" placeholder="Paste YouTube Video or Playlist URL (e.g., https://www.youtube.com/watch?v=fJ9rUzIMcZQ)" class="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-900 border border-brand-border text-sm text-white focus:outline-none focus:border-brand-purple">
+            </div>
+            <button onclick="importYouTubeTrack()" class="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold shadow-lg shadow-red-600/20 flex items-center justify-center space-x-2 shrink-0 transition">
+              <i class="fa-solid fa-cloud-arrow-down"></i>
+              <span>Import to Room</span>
+            </button>
+          </div>
+          <p class="text-[11px] text-slate-400 mt-2"><i class="fa-solid fa-shield-halved text-emerald-400 mr-1"></i> SyncWave coordinates playback clock timestamps while each client device streams through the official player.</p>
+        </div>
+
+        <!-- YouTube Video Preview Simulation Card -->
+        <div id="yt-preview-card" class="glass-panel rounded-2xl p-5 border border-brand-border">
+          <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider mb-3">Current Active YouTube Stream</h3>
+          <div class="flex flex-col md:flex-row gap-5 items-center">
+            <div class="w-full md:w-80 h-44 rounded-xl overflow-hidden bg-black border border-brand-border relative flex items-center justify-center shrink-0">
+              <img id="yt-thumb" src="https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=500&auto=format&fit=crop&q=80" alt="YT Thumbnail" class="w-full h-full object-cover opacity-70">
+              <div class="absolute inset-0 bg-gradient-to-t from-black via-transparent to-black/30"></div>
+              <div class="absolute w-12 h-12 rounded-full bg-red-600/90 text-white flex items-center justify-center text-xl shadow-lg">
+                <i class="fa-solid fa-play ml-0.5"></i>
+              </div>
+            </div>
+            <div class="flex-1 space-y-2">
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-red-500/20 text-red-300 border border-red-500/30 uppercase">IFrame Sync Mode</span>
+              <h4 id="yt-title" class="text-lg font-bold text-white">Queen — Bohemian Rhapsody (Official Synced HD)</h4>
+              <p id="yt-channel" class="text-xs text-slate-400">Queen Official • 4:43 • 1.6B Views</p>
+              <p class="text-xs text-slate-300 leading-relaxed">Broadcasted to 5 connected screens. Server dispatches synchronized `yt.seekTo(t)` & `yt.playVideo()` commands with millisecond time locks.</p>
+              <div class="pt-2 flex items-center space-x-3">
+                <button onclick="queueYouTubeDemo()" class="px-4 py-2 rounded-xl bg-brand-purple hover:bg-purple-600 text-white text-xs font-semibold transition">
+                  <i class="fa-solid fa-play mr-1.5"></i> Play on All Devices
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= TAB 6: LATENCY & NTP CALIBRATION ================= -->
+      <section id="tab-settings" class="tab-content hidden flex-1 p-4 md:p-6 flex flex-col space-y-6">
+        <div>
+          <h2 class="text-xl font-bold text-white flex items-center space-x-2">
+            <i class="fa-solid fa-sliders text-emerald-400"></i>
+            <span>Hardware Latency & NTP Calibration</span>
+          </h2>
+          <p class="text-xs text-slate-400 mt-0.5">Compensate for Bluetooth headphone delay, OS audio buffers, and network round-trip discrepancies.</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <!-- Hardware Delay Compensator -->
+          <div class="glass-panel rounded-2xl p-6 border border-brand-border flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-bold text-white uppercase tracking-wider">Device Hardware Latency Calibration</h3>
+                <span class="text-xs font-mono text-cyan-400" id="hw-offset-badge">+25 ms</span>
+              </div>
+              <p class="text-xs text-slate-300 mb-4 leading-relaxed">
+                If audio sounds like an echo between this device and another room speaker, adjust this slider until both speakers play identically on the beat. Bluetooth speakers typically require +100ms to +200ms of pre-scheduling.
+              </p>
+
+              <!-- Calibration Slider -->
+              <div class="space-y-3">
+                <div class="flex justify-between text-xs text-slate-400 font-mono">
+                  <span>-150 ms (Early)</span>
+                  <span class="text-cyan-400 font-bold text-sm" id="hw-slider-val">+25 ms</span>
+                  <span>+300 ms (Bluetooth Delay)</span>
+                </div>
+                <input type="range" id="latency-slider" min="-150" max="300" step="5" value="25" oninput="updateHardwareLatency(this.value)" class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-400">
+              </div>
+
+              <!-- Quick Presets -->
+              <div class="flex flex-wrap gap-2 mt-4">
+                <button onclick="setLatencyPreset(0)" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-300 border border-brand-border">Built-in Speakers (0ms)</button>
+                <button onclick="setLatencyPreset(35)" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-300 border border-brand-border">Wired Headphones (+35ms)</button>
+                <button onclick="setLatencyPreset(140)" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-300 border border-brand-border">AirPods / TWS (+140ms)</button>
+                <button onclick="setLatencyPreset(220)" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-300 border border-brand-border">Bluetooth Soundbar (+220ms)</button>
+              </div>
+            </div>
+
+            <!-- Audio Metronome Sync Tester -->
+            <div class="mt-6 pt-4 border-t border-brand-border flex items-center justify-between">
+              <div>
+                <span class="text-xs font-semibold text-white">Calibration Metronome Click</span>
+                <p class="text-[10px] text-slate-400">Play an audible tick on the precise second boundary across all devices.</p>
+              </div>
+              <button onclick="triggerMetronomeClick()" class="px-3.5 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold transition shadow-lg shadow-cyan-600/20">
+                <i class="fa-solid fa-stopwatch mr-1.5"></i> Test Click
+              </button>
+            </div>
+          </div>
+
+          <!-- Network Clock Offset (NTP Algorithm Explorer) -->
+          <div class="glass-panel rounded-2xl p-6 border border-brand-border flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm font-bold text-white uppercase tracking-wider">Network NTP Clock Estimation</h3>
+                <button onclick="runNTPCalibration()" class="px-2.5 py-1 rounded-lg bg-brand-purple/40 hover:bg-brand-purple/60 text-purple-200 text-xs font-semibold border border-brand-purple/50">
+                  <i class="fa-solid fa-arrows-rotate mr-1"></i> Resync Clocks
+                </button>
+              </div>
+              <p class="text-xs text-slate-300 mb-4 leading-relaxed">
+                SyncWave uses Cristian's / NTP algorithm over WebSocket pings. Each device performs 8 high-resolution probe bursts, discards outliers, and computes the relative offset $\theta$ and Round-Trip Time (RTT).
+              </p>
+
+              <!-- Formula Box -->
+              <div class="p-3.5 rounded-xl bg-slate-950 font-mono text-xs text-purple-300 border border-brand-border space-y-1">
+                <div>RTT = (T4 - T1) - (T3 - T2)</div>
+                <div>Clock Offset = ((T2 - T1) + (T3 - T4)) / 2</div>
+                <div class="text-emerald-400 text-[11px] mt-1">// Calculated Offset: +1.240 ms (RTT: 18.2 ms)</div>
+              </div>
+
+              <!-- Measurement History Table -->
+              <div class="mt-4 overflow-x-auto">
+                <table class="w-full text-left text-xs font-mono">
+                  <thead>
+                    <tr class="text-slate-500 border-b border-brand-border/60">
+                      <th class="pb-1">Sample</th>
+                      <th class="pb-1">RTT</th>
+                      <th class="pb-1">Est. Offset</th>
+                      <th class="pb-1">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="ntp-samples-body" class="divide-y divide-brand-border/30 text-slate-300">
+                    <!-- Populated by JS -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="mt-4 pt-3 border-t border-brand-border flex items-center justify-between">
+              <span class="text-xs text-slate-400">Sync Quality: <strong class="text-emerald-400 font-bold">Studio Grade (0.3ms jitter)</strong></span>
+              <span class="text-xs font-mono text-slate-400">Protocol: WSS/JSON</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- ================= MODAL 1: ROOM & QR CODE SHARING ================= -->
+  <div id="room-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="glass-panel rounded-3xl p-6 max-w-md w-full border border-brand-border relative shadow-2xl">
+      <button onclick="toggleModal('room-modal')" class="absolute top-4 right-4 text-slate-400 hover:text-white text-lg">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+
+      <div class="text-center">
+        <div class="w-12 h-12 rounded-2xl bg-brand-pink/20 text-brand-pink border border-brand-pink/40 flex items-center justify-center mx-auto mb-3 text-xl">
+          <i class="fa-solid fa-qrcode"></i>
+        </div>
+        <h3 class="text-xl font-extrabold text-white">Join SyncWave Room</h3>
+        <p class="text-xs text-slate-400 mt-1">Scan this QR code with any phone or tablet browser to join this synchronized sound group.</p>
+      </div>
+
+      <!-- Generated QR Code Container -->
+      <div class="my-6 p-4 rounded-2xl bg-white flex items-center justify-center mx-auto w-48 h-48 shadow-inner shadow-black/20" id="qrcode-container"></div>
+
+      <!-- Room Code Display -->
+      <div class="p-3 rounded-xl bg-slate-900 border border-brand-border flex items-center justify-between">
+        <div>
+          <span class="text-[10px] text-slate-400 uppercase font-bold">Room Code</span>
+          <div class="text-xl font-mono font-black text-purple-300 tracking-wider">#810582</div>
+        </div>
+        <button onclick="copyRoomLink()" id="copy-link-btn" class="px-3.5 py-1.5 rounded-lg bg-brand-purple hover:bg-purple-600 text-white text-xs font-semibold flex items-center space-x-1.5 transition">
+          <i class="fa-solid fa-copy"></i>
+          <span>Copy URL</span>
+        </button>
+      </div>
+
+      <!-- Switch / Join Custom Room Input -->
+      <div class="mt-4 pt-4 border-t border-brand-border">
+        <label class="text-xs font-semibold text-slate-300 block mb-1.5">Join another existing Room:</label>
+        <div class="flex space-x-2">
+          <input type="text" id="join-room-input" placeholder="Enter Room Code (e.g., 902100)" class="flex-1 px-3.5 py-2 rounded-xl bg-slate-900 border border-brand-border text-xs text-white uppercase font-mono tracking-wider focus:outline-none focus:border-brand-purple">
+          <button onclick="switchRoomCode()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-white border border-brand-border transition">
+            Join
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MODAL 2: ADD TRACK TO COLLABORATIVE QUEUE ================= -->
+  <div id="add-track-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="glass-panel rounded-3xl p-6 max-w-md w-full border border-brand-border relative shadow-2xl">
+      <button onclick="toggleModal('add-track-modal')" class="absolute top-4 right-4 text-slate-400 hover:text-white text-lg">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+
+      <h3 class="text-lg font-bold text-white mb-1">Add Song to Collaborative Queue</h3>
+      <p class="text-xs text-slate-400 mb-4">Enter track details to add to Room #810582</p>
+
+      <div class="space-y-3">
+        <div>
+          <label class="text-xs text-slate-400 font-medium block mb-1">Track Title</label>
+          <input type="text" id="custom-track-title" placeholder="e.g. Midnight City" class="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-brand-border text-sm text-white focus:outline-none focus:border-brand-purple">
+        </div>
+        <div>
+          <label class="text-xs text-slate-400 font-medium block mb-1">Artist Name</label>
+          <input type="text" id="custom-track-artist" placeholder="e.g. M83" class="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-brand-border text-sm text-white focus:outline-none focus:border-brand-purple">
+        </div>
+        <div>
+          <label class="text-xs text-slate-400 font-medium block mb-1">Audio Source Preset</label>
+          <select id="custom-track-preset" class="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-brand-border text-sm text-white focus:outline-none focus:border-brand-purple">
+            <option value="synthwave">Retro 80s Synthwave Arp (120 BPM)</option>
+            <option value="cyberpunk">Cyberpunk Bassline & Beats (130 BPM)</option>
+            <option value="ambient">Chill Ambient Dream Pad (90 BPM)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="mt-6 flex justify-end space-x-3">
+        <button onclick="toggleModal('add-track-modal')" class="px-4 py-2 rounded-xl bg-slate-800 text-xs font-semibold text-slate-300">Cancel</button>
+        <button onclick="submitNewTrackToQueue()" class="px-5 py-2 rounded-xl bg-gradient-to-r from-brand-purple to-brand-pink text-white text-xs font-bold shadow-lg">Add to Queue</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MODAL 3: DJANGO ARCHITECTURE & CODE INSPECTOR ================= -->
+  <div id="arch-modal" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md hidden flex items-center justify-center p-4">
+    <div class="glass-panel rounded-3xl p-6 max-w-4xl w-full max-h-[90vh] flex flex-col border border-brand-border relative shadow-2xl">
+      <div class="flex items-center justify-between pb-4 border-b border-brand-border">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 text-lg">
+            <i class="fa-solid fa-code"></i>
+          </div>
+          <div>
+            <h3 class="text-lg font-bold text-white">Django + Channels + Redis Architecture Inspector</h3>
+            <p class="text-xs text-slate-400">Production Python code, models, and NTP scheduling logic powering SyncWave.</p>
+          </div>
+        </div>
+        <button onclick="toggleModal('arch-modal')" class="text-slate-400 hover:text-white text-lg">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Code Tabs Header -->
+      <div class="flex space-x-2 border-b border-brand-border mt-3 pb-2 text-xs font-mono overflow-x-auto">
+        <button onclick="showCodeTab('code-models')" class="code-tab-btn active px-3 py-1.5 rounded-lg bg-brand-purple text-white">models.py</button>
+        <button onclick="showCodeTab('code-consumer')" class="code-tab-btn px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700">consumers.py (Channels)</button>
+        <button onclick="showCodeTab('code-ntp')" class="code-tab-btn px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700">sync_engine.py (NTP Math)</button>
+        <button onclick="showCodeTab('code-docker')" class="code-tab-btn px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700">docker-compose.yml</button>
+      </div>
+
+      <!-- Code Viewports -->
+      <div class="flex-1 overflow-y-auto mt-4 p-4 rounded-xl bg-slate-950 border border-brand-border font-mono text-xs leading-relaxed text-slate-300">
+        
+        <!-- Code snippet 1: models.py -->
+        <pre id="code-models" class="code-viewport whitespace-pre-wrap"><code class="text-purple-300"># syncwave/rooms/models.py
+import uuid
+from django.db import models
+from django.contrib.auth.models import User
+
+class Room(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    code = models.CharField(max_length=12, unique=True, db_index=True)
+    name = models.CharField(max_length=100)
+    host = models.ForeignKey(User, on_delete=models.CASCADE, related_name='hosted_rooms')
+    is_spatial_enabled = models.BooleanField(default=True)
+    is_collaborative_queue = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Room {self.code} ({self.name})"
+
+class Device(models.Model):
+    DEVICE_TYPES = [
+        ('laptop', 'Laptop'),
+        ('phone', 'Smartphone'),
+        ('tablet', 'Tablet'),
+        ('desktop', 'Desktop'),
+        ('tv', 'Smart TV'),
+    ]
+    room = models.ForeignKey(Room, on_delete=models.CASCADE, related_name='devices')
+    session_id = models.CharField(max_length=64, unique=True)
+    name = models.CharField(max_length=100)
+    device_type = models.CharField(max_length=20, choices=DEVICE_TYPES, default='phone')
+    clock_offset_ms = models.FloatField(default=0.0)
+    hardware_latency_ms = models.FloatField(default=25.0)
+    volume = models.FloatField(default=0.85)
+    is_muted = models.BooleanField(default=False)
+    stage_x = models.FloatField(default=50.0)
+    stage_y = models.FloatField(default=50.0)
+    last_ping = models.DateTimeField(auto_now=True)
+
+class PlaybackState(models.Model):
+    room = models.OneToOneField(Room, on_delete=models.CASCADE, related_name='playback_state')
+    current_track_url = models.URLField()
+    is_playing = models.BooleanField(default=False)
+    position_seconds = models.FloatField(default=0.0)
+    server_timestamp = models.FloatField(help_text="UNIX timestamp when action was scheduled")
+    speed = models.FloatField(default=1.0)
+</code></pre>
+
+        <!-- Code snippet 2: consumers.py -->
+        <pre id="code-consumer" class="code-viewport hidden whitespace-pre-wrap"><code class="text-cyan-300"># syncwave/synchronization/consumers.py
+import json
+import time
+from channels.generic.websocket import AsyncWebsocketConsumer
+
+class RoomConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        self.room_code = self.scope['url_route']['kwargs']['room_code']
+        self.room_group_name = f'syncwave_room_{self.room_code}'
+
+        # Join Redis Channel Layer Group
+        await self.channel_layer.group_add(
+            self.room_group_name,
+            self.channel_name
+        )
+        await self.accept()
+
+    async def disconnect(self, close_code):
+        await self.channel_layer.group_discard(
+            self.room_group_name,
+            self.channel_name
+        )
+
+    async def receive(self, text_data):
+        payload = json.loads(text_data)
+        event_type = payload.get('type')
+        client_time = payload.get('client_time', 0.0)
+        server_now = time.time() * 1000.0  # Precise milliseconds
+
+        # High-precision NTP Ping/Pong Handling
+        if event_type == 'PING':
+            await self.send(text_data=json.dumps({
+                'type': 'PONG',
+                'client_t1': client_time,
+                'server_t2': server_now,
+                'server_t3': time.time() * 1000.0
+            }))
+            return
+
+        # Synchronized Playback Scheduling Broadcast
+        if event_type == 'SCHEDULE_PLAY':
+            # Lead time buffer ensures all devices pre-buffer and trigger on exact millisecond
+            schedule_time = server_now + 1200.0  
+            await self.channel_layer.group_send(
+                self.room_group_name,
+                {
+                    'type': 'broadcast_playback',
+                    'action': 'PLAY',
+                    'position': payload.get('position', 0.0),
+                    'scheduled_start': schedule_time,
+                    'track_id': payload.get('track_id')
+                }
+            )
+
+    async def broadcast_playback(self, event):
+        await self.send(text_data=json.dumps(event))
+</code></pre>
+
+        <!-- Code snippet 3: sync_engine.py -->
+        <pre id="code-ntp" class="code-viewport hidden whitespace-pre-wrap"><code class="text-amber-300"># syncwave/synchronization/sync_engine.py
+"""
+High-Precision Cristian's NTP Clock Synchronization Algorithm
+Used by SyncWave to establish a unified virtual room clock.
+"""
+import numpy as np
+
+def compute_ntp_offset(samples):
+    """
+    samples is a list of tuples: (t1, t2, t3, t4)
+    t1: client send time
+    t2: server receive time
+    t3: server response send time
+    t4: client receive time
+    """
+    offsets = []
+    rtts = []
+    for t1, t2, t3, t4 in samples:
+        rtt = (t4 - t1) - (t3 - t2)
+        offset = ((t2 - t1) + (t3 - t4)) / 2.0
+        rtts.append(rtt)
+        offsets.append(offset)
+
+    # Filter out top 25% highest RTT outliers (network jitter protection)
+    sorted_indices = np.argsort(rtts)
+    best_samples = sorted_indices[:max(1, int(len(samples) * 0.75))]
+    calibrated_offset = np.median([offsets[i] for i in best_samples])
+    return calibrated_offset
+</code></pre>
+
+        <!-- Code snippet 4: docker-compose.yml -->
+        <pre id="code-docker" class="code-viewport hidden whitespace-pre-wrap"><code class="text-emerald-300"># docker-compose.production.yml
+version: '3.9'
+
+services:
+  web:
+    build: .
+    command: daphne -b 0.0.0.0 -p 8000 syncwave.asgi:application
+    environment:
+      - DATABASE_URL=postgres://syncwave:password@db:5432/syncwave_db
+      - REDIS_URL=redis://redis:6379/0
+      - DJANGO_SETTINGS_MODULE=syncwave.config.production
+    depends_on:
+      - db
+      - redis
+    ports:
+      - "8000:8000"
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: syncwave_db
+      POSTGRES_USER: syncwave
+      POSTGRES_PASSWORD: password
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
+</code></pre>
+      </div>
+
+      <div class="mt-4 pt-3 border-t border-brand-border flex items-center justify-between text-xs text-slate-400">
+        <span>Framework: <strong class="text-white">Django 5.x & Channels 4.x</strong></span>
+        <button onclick="toggleModal('arch-modal')" class="px-4 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-semibold">Close Inspector</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+
+  <script>
+    /**
+     * SyncWave Core Client Engine
+     * Handles Web Audio API polyphonic sound generator, NTP time synchronization,
+     * cross-tab BroadcastChannel communication, 2D spatial audio stage calculations,
+     * and responsive visualizer animation loop.
+     */
+
+    // Global App State
+    const state = {
+      roomId: '810582',
+      isHost: true,
+      audioUnlocked: false,
+      isPlaying: false,
+      currentTime: 0,
+      duration: 204, // 3:24 in seconds
+      volume: 0.85,
+      isMuted: false,
+      hardwareLatencyMs: 25, // compensation slider
+      estimatedClockOffsetMs: 1.24, // calculated via NTP
+      spatialAudioEnabled: true,
+      currentTrackIndex: 0,
+      playlist: [
+        {
+          id: 'trk-1',
+          title: 'Blinding Lights (SyncWave Remaster)',
+          artist: 'The Weeknd • Synth Orchestra',
+          genre: 'Synthwave / 120 BPM',
+          duration: 204,
+          art: 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=400&auto=format&fit=crop&q=80',
+          type: 'synth-synthwave'
+        },
+        {
+          id: 'trk-2',
+          title: 'Believer (Spatial Room Acoustic)',
+          artist: 'Imagine Dragons',
+          genre: 'Arena Rock / 125 BPM',
+          duration: 216,
+          art: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&auto=format&fit=crop&q=80',
+          type: 'synth-cyberpunk'
+        },
+        {
+          id: 'trk-3',
+          title: 'Midnight City (Neon Echoes)',
+          artist: 'M83 • Dreamwave',
+          genre: 'Dreamwave / 105 BPM',
+          duration: 243,
+          art: 'https://images.unsplash.com/photo-1508700115892-45ecd05ae2ad?w=400&auto=format&fit=crop&q=80',
+          type: 'synth-ambient'
+        },
+        {
+          id: 'trk-4',
+          title: 'Faded (Sub-Bass Synchronized)',
+          artist: 'Alan Walker',
+          genre: 'EDM / 90 BPM',
+          duration: 198,
+          art: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&auto=format&fit=crop&q=80',
+          type: 'synth-synthwave'
+        }
+      ],
+      devices: [
+        { id: 'dev-1', name: "Abhishek's Laptop", type: 'laptop', isHost: true, ping: 14, status: 'Synced', volume: 85, muted: false, x: 70, y: 35 },
+        { id: 'dev-2', name: 'Samsung Galaxy S24', type: 'phone', isHost: false, ping: 22, status: 'Synced', volume: 80, muted: false, x: 28, y: 40 },
+        { id: 'dev-3', name: 'iPhone 15 Pro Max', type: 'phone', isHost: false, ping: 18, status: 'Synced', volume: 90, muted: false, x: 45, y: 78 },
+        { id: 'dev-4', name: 'Living Room Smart TV', type: 'tv', isHost: false, ping: 31, status: 'Synced', volume: 100, muted: false, x: 80, y: 80 },
+        { id: 'dev-5', name: 'iPad Pro Studio', type: 'tablet', isHost: false, ping: 16, status: 'Synced', volume: 75, muted: false, x: 20, y: 75 }
+      ],
+      queue: [
+        { id: 'q-1', title: 'Midnight City', artist: 'M83', duration: '4:03', user: 'Samsung S24', votes: 14 },
+        { id: 'q-2', title: 'Shape of You (Club Mix)', artist: 'Ed Sheeran', duration: '3:53', user: 'iPad Pro', votes: 11 },
+        { id: 'q-3', title: 'Starboy', artist: 'The Weeknd', duration: '3:50', user: 'Smart TV', votes: 7 },
+        { id: 'q-4', title: 'Get Lucky', artist: 'Daft Punk', duration: '4:08', user: 'iPhone 15', votes: 5 }
+      ],
+      ntpSamples: [
+        { sample: 1, rtt: '18.4 ms', offset: '+1.20 ms', status: 'Optimal' },
+        { sample: 2, rtt: '19.1 ms', offset: '+1.28 ms', status: 'Optimal' },
+        { sample: 3, rtt: '24.2 ms', offset: '+1.45 ms', status: 'Jitter' },
+        { sample: 4, rtt: '17.9 ms', offset: '+1.19 ms', status: 'Optimal' },
+        { sample: 5, rtt: '18.2 ms', offset: '+1.24 ms', status: 'Optimal' }
+      ]
+    };
+
+    // Web Audio API Context and Nodes
+    let audioCtx = null;
+    let masterGain = null;
+    let analyserNode = null;
+    let synthInterval = null;
+    let animFrameId = null;
+
+    // Real Cross-Tab Synchronization via BroadcastChannel API
+    const syncChannel = new BroadcastChannel('syncwave_room_810582');
+
+    syncChannel.onmessage = (event) => {
+      const msg = event.data;
+      if (!msg) return;
+
+      if (msg.type === 'SYNC_PLAY') {
+        const scheduledDelay = Math.max(0, msg.scheduledTime - getSynchronizedTime());
+        setTimeout(() => {
+          state.currentTime = msg.position;
+          startAudioPlayback(false);
+          showToast(`Synchronized PLAY triggered from ${msg.sender}`, 'info');
+        }, scheduledDelay);
+      } else if (msg.type === 'SYNC_PAUSE') {
+        pauseAudioPlayback(false);
+        showToast(`Synchronized PAUSE received`, 'info');
+      } else if (msg.type === 'SYNC_SEEK') {
+        state.currentTime = msg.position;
+        updatePlayerUI();
+      } else if (msg.type === 'SYNC_TRACK') {
+        state.currentTrackIndex = msg.trackIndex;
+        loadTrack(state.currentTrackIndex, false);
+      }
+    };
+
+    /**
+     * Clock offset synchronization math
+     */
+    function getSynchronizedTime() {
+      return Date.now() + state.estimatedClockOffsetMs + state.hardwareLatencyMs;
+    }
+
+    function initWebAudio() {
+      if (audioCtx) return;
+      try {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioContextClass();
+        masterGain = audioCtx.createGain();
+        masterGain.gain.setValueAtTime(state.volume, audioCtx.currentTime);
+
+        analyserNode = audioCtx.createAnalyser();
+        analyserNode.fftSize = 128;
+        analyserNode.smoothingTimeConstant = 0.8;
+
+        masterGain.connect(analyserNode);
+        analyserNode.connect(audioCtx.destination);
+      } catch (err) {
+        console.warn('Web Audio API not supported or blocked:', err);
+      }
+    }
+
+    function unlockAudioContext() {
+      initWebAudio();
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume().then(() => {
+          audioUnlockedSuccess();
+        });
+      } else {
+        audioUnlockedSuccess();
+      }
+    }
+
+    function audioUnlockedSuccess() {
+      state.audioUnlocked = true;
+      const btn = document.getElementById('unlock-audio-btn');
+      if (btn) {
+        btn.classList.remove('bg-gradient-to-r', 'from-amber-500', 'to-orange-500', 'animate-bounce');
+        btn.classList.add('bg-emerald-600', 'text-white');
+        btn.innerHTML = '<i class="fa-solid fa-check mr-1.5"></i> Audio Ready';
+      }
+      document.getElementById('visualizer-overlay').style.opacity = '0';
+      setTimeout(() => {
+        document.getElementById('visualizer-overlay').style.display = 'none';
+      }, 300);
+      showToast('Web Audio Engine & Frequency Analyser Active!', 'success');
+    }
+
+    /**
+     * Procedural Polyphonic Synthesizer Beat Generator
+     * Synthesizes warm musical chords, kicks, and synthwave leads in realtime.
+     */
+    function triggerSynthBeat(step) {
+      if (!audioCtx || !state.isPlaying || audioCtx.state !== 'running') return;
+      const now = audioCtx.currentTime;
+
+      // 1. Synth Kick Drum (every quarter beat)
+      if (step % 4 === 0) {
+        const oscKick = audioCtx.createOscillator();
+        const kickGain = audioCtx.createGain();
+        oscKick.frequency.setValueAtTime(140, now);
+        oscKick.frequency.exponentialRampToValueAtTime(32, now + 0.12);
+        kickGain.gain.setValueAtTime(0.7 * state.volume, now);
+        kickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+        oscKick.connect(kickGain);
+        kickGain.connect(masterGain);
+        oscKick.start(now);
+        oscKick.stop(now + 0.18);
+      }
+
+      // 2. Snare / Clack (steps 4 and 12)
+      if (step % 8 === 4) {
+        const snareOsc = audioCtx.createOscillator();
+        const snareGain = audioCtx.createGain();
+        snareOsc.type = 'triangle';
+        snareOsc.frequency.setValueAtTime(220, now);
+        snareGain.gain.setValueAtTime(0.4 * state.volume, now);
+        snareGain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+        snareOsc.connect(snareGain);
+        snareGain.connect(masterGain);
+        snareOsc.start(now);
+        snareOsc.stop(now + 0.12);
+      }
+
+      // 3. Synthwave Arpeggio Chords
+      const chordNotes = [261.63, 329.63, 392.00, 523.25, 659.25]; // C Major pentatonic
+      const noteFreq = chordNotes[step % chordNotes.length];
+      
+      const arpOsc = audioCtx.createOscillator();
+      const arpGain = audioCtx.createGain();
+      arpOsc.type = 'sawtooth';
+      arpOsc.frequency.setValueAtTime(noteFreq, now);
+
+      arpGain.gain.setValueAtTime(0.18 * state.volume, now);
+      arpGain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+
+      arpOsc.connect(arpGain);
+      arpGain.connect(masterGain);
+      arpOsc.start(now);
+      arpOsc.stop(now + 0.25);
+    }
+
+    function startVisualizer() {
+      const canvas = document.getElementById('visualizer-canvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+
+      function resizeCanvas() {
+        if (canvas.clientWidth !== canvas.width || canvas.clientHeight !== canvas.height) {
+          canvas.width = canvas.clientWidth;
+          canvas.height = canvas.clientHeight;
+        }
+      }
+      resizeCanvas();
+      window.addEventListener('resize', resizeCanvas);
+
+      const bufferLength = analyserNode ? analyserNode.frequencyBinCount : 64;
+      const dataArray = new Uint8Array(bufferLength);
+
+      function draw() {
+        animFrameId = requestAnimationFrame(draw);
+        resizeCanvas();
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Background subtle grid
+        ctx.fillStyle = 'rgba(11, 13, 25, 0.4)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        if (analyserNode && state.isPlaying) {
+          analyserNode.getByteFrequencyData(dataArray);
+        } else {
+          // Idle low ambient pulse when paused
+          for (let i = 0; i < bufferLength; i++) {
+            dataArray[i] = Math.sin(Date.now() * 0.003 + i * 0.2) * 8 + 8;
+          }
+        }
+
+        const barWidth = (canvas.width / (bufferLength * 0.75));
+        let x = 0;
+
+        for (let i = 0; i < bufferLength * 0.75; i++) {
+          const barHeight = (dataArray[i] / 255) * (canvas.height * 0.85);
+
+          // Dynamic Neon Gradient
+          const gradient = ctx.createLinearGradient(0, canvas.height, 0, canvas.height - barHeight);
+          gradient.addColorStop(0, '#7c3aed'); // Purple
+          gradient.addColorStop(0.5, '#ec4899'); // Pink
+          gradient.addColorStop(1, '#06b6d4'); // Cyan
+
+          ctx.fillStyle = gradient;
+          ctx.beginPath();
+          ctx.roundRect(x, canvas.height - barHeight - 4, Math.max(2, barWidth - 3), barHeight + 4, [4, 4, 0, 0]);
+          ctx.fill();
+
+          x += barWidth;
+        }
+      }
+      draw();
+    }
+
+    function togglePlayPauseMaster() {
+      if (!state.audioUnlocked) {
+        unlockAudioContext();
+      }
+
+      if (state.isPlaying) {
+        pauseAudioPlayback(true);
+      } else {
+        startAudioPlayback(true);
+      }
+    }
+
+    function startAudioPlayback(broadcast = true) {
+      initWebAudio();
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+
+      state.isPlaying = true;
+      document.getElementById('master-play-icon').classList.replace('fa-play', 'fa-pause');
+      document.getElementById('master-play-icon').classList.remove('ml-0.5');
+      document.getElementById('player-artwork').classList.add('animate-spin-slow');
+
+      // Start Synthesizer Beat Timer
+      let stepCounter = 0;
+      clearInterval(synthInterval);
+      synthInterval = setInterval(() => {
+        triggerSynthBeat(stepCounter);
+        stepCounter = (stepCounter + 1) % 16;
+        
+        // Progress second ticker
+        state.currentTime += 0.125;
+        if (state.currentTime >= state.duration) {
+          playNextTrack();
+        }
+        updateProgressBar();
+      }, 125); // 120 BPM 16th notes
+
+      if (broadcast) {
+        // Schedule future start to simulate NTP safety buffer
+        const scheduledTime = getSynchronizedTime() + 100; // 100ms safety lead
+        syncChannel.postMessage({
+          type: 'SYNC_PLAY',
+          position: state.currentTime,
+          scheduledTime: scheduledTime,
+          sender: "Abhishek's Laptop (Host)"
+        });
+      }
+
+      updateSyncPill('🟢 Synced (±1.2ms)');
+    }
+
+    function pauseAudioPlayback(broadcast = true) {
+      state.isPlaying = false;
+      clearInterval(synthInterval);
+      document.getElementById('master-play-icon').classList.replace('fa-pause', 'fa-play');
+      document.getElementById('master-play-icon').classList.add('ml-0.5');
+      document.getElementById('player-artwork').classList.remove('animate-spin-slow');
+
+      if (broadcast) {
+        syncChannel.postMessage({
+          type: 'SYNC_PAUSE',
+          position: state.currentTime,
+          sender: "Abhishek's Laptop (Host)"
+        });
+      }
+    }
+
+    function playNextTrack() {
+      state.currentTrackIndex = (state.currentTrackIndex + 1) % state.playlist.length;
+      loadTrack(state.currentTrackIndex, true);
+    }
+
+    function playPrevTrack() {
+      state.currentTrackIndex = (state.currentTrackIndex - 1 + state.playlist.length) % state.playlist.length;
+      loadTrack(state.currentTrackIndex, true);
+    }
+
+    function loadTrack(index, broadcast = true) {
+      const track = state.playlist[index];
+      state.currentTime = 0;
+      state.duration = track.duration;
+
+      document.getElementById('player-title').innerText = track.title;
+      document.getElementById('player-artist').innerText = track.artist;
+      document.getElementById('player-genre').innerText = track.genre;
+      document.getElementById('player-artwork').src = track.art;
+      document.getElementById('duration-display').innerText = formatTime(track.duration);
+
+      updateProgressBar();
+
+      if (broadcast) {
+        syncChannel.postMessage({
+          type: 'SYNC_TRACK',
+          trackIndex: index
+        });
+      }
+
+      if (state.isPlaying) {
+        startAudioPlayback(false);
+      }
+      showToast(`Now playing: ${track.title}`, 'info');
+    }
+
+    function handleSeekClick(event) {
+      const container = document.getElementById('progress-bar-container');
+      const rect = container.getBoundingClientRect();
+      const clickX = event.clientX - rect.left;
+      const ratio = Math.max(0, Math.min(1, clickX / rect.width));
+      state.currentTime = ratio * state.duration;
+      updateProgressBar();
+
+      syncChannel.postMessage({
+        type: 'SYNC_SEEK',
+        position: state.currentTime
+      });
+    }
+
+    function updateProgressBar() {
+      const pct = Math.min(100, (state.currentTime / state.duration) * 100);
+      document.getElementById('progress-fill').style.width = `${pct}%`;
+      document.getElementById('current-time-display').innerText = formatTime(state.currentTime);
+    }
+
+    function adjustMasterVolume(val) {
+      state.volume = parseFloat(val);
+      if (masterGain && audioCtx) {
+        masterGain.gain.setValueAtTime(state.isMuted ? 0 : state.volume, audioCtx.currentTime);
+      }
+      document.getElementById('master-volume-label').innerText = `${Math.round(state.volume * 100)}%`;
+      updateVolumeIcon();
+    }
+
+    function toggleMuteMaster() {
+      state.isMuted = !state.isMuted;
+      if (masterGain && audioCtx) {
+        masterGain.gain.setValueAtTime(state.isMuted ? 0 : state.volume, audioCtx.currentTime);
+      }
+      updateVolumeIcon();
+    }
+
+    function updateVolumeIcon() {
+      const icon = document.getElementById('volume-icon');
+      if (state.isMuted || state.volume === 0) {
+        icon.className = 'fa-solid fa-volume-xmark text-brand-pink';
+      } else if (state.volume < 0.4) {
+        icon.className = 'fa-solid fa-volume-low text-slate-300';
+      } else {
+        icon.className = 'fa-solid fa-volume-high text-white';
+      }
+    }
+
+    function toggleShuffle() {
+      const btn = document.getElementById('shuffle-btn');
+      btn.classList.toggle('text-brand-pink');
+      showToast('Shuffle Mode Toggled', 'info');
+    }
+
+    function toggleRepeat() {
+      const btn = document.getElementById('repeat-btn');
+      btn.classList.toggle('text-brand-pink');
+      showToast('Repeat Mode Toggled', 'info');
+    }
+
+    function formatTime(seconds) {
+      const mins = Math.floor(seconds / 60);
+      const secs = Math.floor(seconds % 60);
+      return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+    }
+
+    function renderSpatialStage() {
+      const container = document.getElementById('stage-devices-container');
+      container.innerHTML = '';
+
+      state.devices.forEach((dev) => {
+        const el = document.createElement('div');
+        el.id = `spatial-dev-${dev.id}`;
+        el.className = 'absolute cursor-grab active:cursor-grabbing flex flex-col items-center select-none group transition-transform duration-75';
+        el.style.left = `${dev.x}%`;
+        el.style.top = `${dev.y}%`;
+
+        // Device specific icon
+        let iconClass = 'fa-mobile-screen';
+        if (dev.type === 'laptop') iconClass = 'fa-laptop';
+        if (dev.type === 'tablet') iconClass = 'fa-tablet-screen-button';
+        if (dev.type === 'tv') iconClass = 'fa-tv';
+        if (dev.type === 'desktop') iconClass = 'fa-desktop';
+
+        el.innerHTML = `
+          <div class="relative w-11 h-11 rounded-2xl ${dev.isHost ? 'bg-gradient-to-tr from-purple-600 to-indigo-600' : 'bg-slate-800'} border-2 ${dev.isHost ? 'border-purple-400' : 'border-slate-600'} flex items-center justify-center text-white shadow-lg shadow-black/50 group-hover:scale-110">
+            <i class="fa-solid ${iconClass} text-sm"></i>
+            <span class="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-emerald-400 border-2 border-slate-900"></span>
+          </div>
+          <div class="mt-1 px-2 py-0.5 rounded bg-slate-900/90 border border-slate-700 text-[10px] font-bold text-slate-200 whitespace-nowrap text-center shadow">
+            ${dev.name.split(' ')[0]} • <span class="text-cyan-400" id="stage-vol-${dev.id}">${dev.volume}%</span>
+          </div>
+        `;
+
+        setupDraggable(el, dev);
+        container.appendChild(el);
+      });
+    }
+
+    function setupDraggable(element, device) {
+      let isDragging = false;
+      const stage = document.getElementById('spatial-stage');
+
+      const onStart = (e) => {
+        isDragging = true;
+        element.style.zIndex = '30';
+      };
+
+      const onMove = (e) => {
+        if (!isDragging) return;
+        const rect = stage.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+        let posX = ((clientX - rect.left) / rect.width) * 100;
+        let posY = ((clientY - rect.top) / rect.height) * 100;
+
+        posX = Math.max(5, Math.min(95, posX));
+        posY = Math.max(8, Math.min(92, posY));
+
+        device.x = posX;
+        device.y = posY;
+        element.style.left = `${posX}%`;
+        element.style.top = `${posY}%`;
+
+        // Calculate Spatial Distance Attenuation & Stereo Panning
+        calculateSpatialAudio(device);
+      };
+
+      const onEnd = () => {
+        if (isDragging) {
+          isDragging = false;
+          element.style.zIndex = '10';
+        }
+      };
+
+      element.addEventListener('mousedown', onStart);
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onEnd);
+
+      element.addEventListener('touchstart', onStart, { passive: true });
+      window.addEventListener('touchmove', onMove, { passive: true });
+      window.addEventListener('touchend', onEnd);
+    }
+
+    function calculateSpatialAudio(device) {
+      if (!state.spatialAudioEnabled) return;
+
+      // Distance from center (50%, 50%)
+      const dx = device.x - 50;
+      const dy = device.y - 50;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      // Distance attenuation: Closer to center = louder, farther = softer (40% to 100%)
+      const maxDistance = 60; // hypotenuse radius approx
+      const attenuation = Math.max(0.4, 1.0 - (distance / maxDistance) * 0.6);
+      const computedVol = Math.round(attenuation * 100);
+      device.volume = computedVol;
+
+      // Stereo pan: dx normalized from -50 (Left) to +50 (Right)
+      const pan = Math.max(-1, Math.min(1, dx / 45));
+
+      const volBadge = document.getElementById(`stage-vol-${device.id}`);
+      if (volBadge) volBadge.innerText = `${computedVol}%`;
+
+      // Update in Connected Devices List slider
+      const devSlider = document.getElementById(`device-slider-${device.id}`);
+      if (devSlider) devSlider.value = computedVol;
+      const devVolLabel = document.getElementById(`device-vol-label-${device.id}`);
+      if (devVolLabel) devVolLabel.innerText = `${computedVol}%`;
+    }
+
+    function toggleSpatialAudio(enabled) {
+      state.spatialAudioEnabled = enabled;
+      showToast(`Spatial 2D Audio ${enabled ? 'Enabled' : 'Disabled'}`, 'info');
+      if (enabled) {
+        state.devices.forEach(calculateSpatialAudio);
+      }
+    }
+
+    function resetStagePositions() {
+      const defaultPositions = [
+        { x: 50, y: 25 },
+        { x: 28, y: 40 },
+        { x: 72, y: 40 },
+        { x: 25, y: 75 },
+        { x: 75, y: 75 }
+      ];
+      state.devices.forEach((dev, idx) => {
+        if (defaultPositions[idx]) {
+          dev.x = defaultPositions[idx].x;
+          dev.y = defaultPositions[idx].y;
+          calculateSpatialAudio(dev);
+        }
+      });
+      renderSpatialStage();
+      showToast('Spatial Stage Layout Reset', 'info');
+    }
+
+    function renderDevicesList() {
+      const grid = document.getElementById('devices-grid');
+      grid.innerHTML = '';
+
+      state.devices.forEach((dev) => {
+        let iconClass = 'fa-mobile-screen';
+        if (dev.type === 'laptop') iconClass = 'fa-laptop';
+        if (dev.type === 'tablet') iconClass = 'fa-tablet-screen-button';
+        if (dev.type === 'tv') iconClass = 'fa-tv';
+        if (dev.type === 'desktop') iconClass = 'fa-desktop';
+
+        const card = document.createElement('div');
+        card.className = 'glass-card rounded-2xl p-4 border border-brand-border flex flex-col justify-between space-y-3';
+        card.innerHTML = `
+          <div class="flex items-start justify-between">
+            <div class="flex items-center space-x-3">
+              <div class="w-11 h-11 rounded-xl bg-slate-800 border border-brand-border flex items-center justify-center text-slate-200 text-lg">
+                <i class="fa-solid ${iconClass} ${dev.isHost ? 'text-brand-pink' : 'text-cyan-400'}"></i>
+              </div>
+              <div>
+                <div class="flex items-center space-x-2">
+                  <h4 class="text-sm font-bold text-white">${dev.name}</h4>
+                  ${dev.isHost ? '<span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-brand-purple/40 text-purple-300 border border-brand-purple/50">HOST</span>' : ''}
+                </div>
+                <div class="flex items-center space-x-2 mt-0.5">
+                  <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span class="text-xs text-emerald-400 font-medium">${dev.status}</span>
+                  <span class="text-xs text-slate-500">•</span>
+                  <span class="text-xs font-mono text-slate-400">Latency: ${dev.ping} ms</span>
+                </div>
+              </div>
+            </div>
+
+            ${!dev.isHost ? `
+              <button onclick="transferHostTo('${dev.id}')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-[10px] font-bold text-slate-300 border border-brand-border transition" title="Transfer Host Control">
+                Make Host
+              </button>
+            ` : ''}
+          </div>
+
+          <!-- Volume and Mute Controls -->
+          <div class="pt-2 border-t border-brand-border/50 flex items-center space-x-3">
+            <button onclick="toggleDeviceMute('${dev.id}')" class="text-slate-400 hover:text-white text-xs">
+              <i id="dev-mute-icon-${dev.id}" class="fa-solid ${dev.muted ? 'fa-volume-xmark text-brand-pink' : 'fa-volume-high'}"></i>
+            </button>
+            <input type="range" id="device-slider-${dev.id}" min="0" max="100" value="${dev.volume}" oninput="setDeviceVolume('${dev.id}', this.value)" class="flex-1 h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-brand-purple">
+            <span id="device-vol-label-${dev.id}" class="text-xs font-mono text-slate-400 w-8 text-right">${dev.volume}%</span>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+
+      document.getElementById('sidebar-device-count').innerText = state.devices.length;
+      document.getElementById('player-listeners').innerText = `${state.devices.length} Devices`;
+    }
+
+    function setDeviceVolume(id, vol) {
+      const dev = state.devices.find(d => d.id === id);
+      if (dev) {
+        dev.volume = parseInt(vol);
+        document.getElementById(`device-vol-label-${id}`).innerText = `${vol}%`;
+        const stageVol = document.getElementById(`stage-vol-${id}`);
+        if (stageVol) stageVol.innerText = `${vol}%`;
+      }
+    }
+
+    function toggleDeviceMute(id) {
+      const dev = state.devices.find(d => d.id === id);
+      if (dev) {
+        dev.muted = !dev.muted;
+        renderDevicesList();
+        showToast(`${dev.name} ${dev.muted ? 'Muted' : 'Unmuted'}`, 'info');
+      }
+    }
+
+    function transferHostTo(id) {
+      state.devices.forEach(d => d.isHost = (d.id === id));
+      renderDevicesList();
+      renderSpatialStage();
+      showToast(`Host transferred to ${state.devices.find(d => d.id === id).name}`, 'success');
+    }
+
+    function simulateAddDevice() {
+      const types = ['phone', 'tablet', 'laptop', 'tv'];
+      const names = ['Google Pixel 8', 'MacBook Air M2', 'Sony Bravia 4K', 'OnePlus 12', 'Bose Smart Speaker'];
+      const randName = names[Math.floor(Math.random() * names.length)];
+      const randType = types[Math.floor(Math.random() * types.length)];
+
+      const newDev = {
+        id: `dev-${Date.now()}`,
+        name: randName,
+        type: randType,
+        isHost: false,
+        ping: Math.floor(Math.random() * 15) + 12,
+        status: 'Synced',
+        volume: 80,
+        muted: false,
+        x: Math.floor(Math.random() * 60) + 20,
+        y: Math.floor(Math.random() * 60) + 20
+      };
+
+      state.devices.push(newDev);
+      renderDevicesList();
+      renderSpatialStage();
+      showToast(`🟢 New device joined: ${randName}`, 'success');
+    }
+
+    function broadcastPingAll() {
+      state.devices.forEach(d => {
+        d.ping = Math.floor(Math.random() * 12) + 10;
+      });
+      renderDevicesList();
+      showToast('All devices pinged. Clocks synchronized.', 'info');
+    }
+
+    function renderQueue() {
+      const list = document.getElementById('queue-list');
+      list.innerHTML = '';
+
+      state.queue.forEach((item, index) => {
+        const row = document.createElement('div');
+        row.className = 'p-3.5 hover:bg-slate-800/40 transition flex items-center justify-between text-xs group';
+        row.innerHTML = `
+          <div class="w-10 font-mono text-slate-500 font-bold">${index + 1}</div>
+          <div class="flex-1 min-w-0 pr-3">
+            <h5 class="font-bold text-white text-sm truncate">${item.title}</h5>
+            <p class="text-slate-400 truncate">${item.artist} • ${item.duration}</p>
+          </div>
+          <div class="hidden sm:block w-32 text-center text-slate-400 truncate">${item.user}</div>
+          <div class="w-24 text-center">
+            <button onclick="upvoteQueueItem('${item.id}')" class="px-2.5 py-1 rounded-lg bg-slate-800 group-hover:bg-brand-purple/20 text-purple-300 font-bold border border-brand-border flex items-center space-x-1.5 mx-auto transition">
+              <i class="fa-solid fa-thumbs-up text-[10px]"></i>
+              <span>${item.votes}</span>
+            </button>
+          </div>
+          <div class="w-24 text-right flex items-center justify-end space-x-2">
+            <button onclick="playQueueItem(${index})" class="text-slate-400 hover:text-white" title="Play Now"><i class="fa-solid fa-play"></i></button>
+            <button onclick="removeQueueItem('${item.id}')" class="text-slate-500 hover:text-rose-400" title="Remove"><i class="fa-solid fa-trash"></i></button>
+          </div>
+        `;
+        list.appendChild(row);
+      });
+
+      document.getElementById('sidebar-queue-count').innerText = state.queue.length;
+    }
+
+    function upvoteQueueItem(id) {
+      const item = state.queue.find(q => q.id === id);
+      if (item) {
+        item.votes += 1;
+        state.queue.sort((a, b) => b.votes - a.votes);
+        renderQueue();
+        showToast(`Voted for "${item.title}"`, 'success');
+      }
+    }
+
+    function playQueueItem(index) {
+      const item = state.queue[index];
+      state.playlist.splice(state.currentTrackIndex + 1, 0, {
+        id: `trk-q-${Date.now()}`,
+        title: item.title,
+        artist: item.artist,
+        genre: 'Collaborative Queue',
+        duration: 210,
+        art: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400&auto=format&fit=crop&q=80',
+        type: 'synth-synthwave'
+      });
+      playNextTrack();
+    }
+
+    function removeQueueItem(id) {
+      state.queue = state.queue.filter(q => q.id !== id);
+      renderQueue();
+      showToast('Track removed from queue', 'info');
+    }
+
+    function openAddTrackModal() {
+      toggleModal('add-track-modal');
+    }
+
+    function submitNewTrackToQueue() {
+      const title = document.getElementById('custom-track-title').value.trim();
+      const artist = document.getElementById('custom-track-artist').value.trim() || 'Unknown Artist';
+
+      if (!title) {
+        showToast('Please enter a track title', 'error');
+        return;
+      }
+
+      state.queue.push({
+        id: `q-${Date.now()}`,
+        title: title,
+        artist: artist,
+        duration: '3:30',
+        user: "Abhishek's Laptop",
+        votes: 1
+      });
+
+      document.getElementById('custom-track-title').value = '';
+      document.getElementById('custom-track-artist').value = '';
+      toggleModal('add-track-modal');
+      renderQueue();
+      showToast(`Added "${title}" to collaborative queue!`, 'success');
+    }
+
+    function renderLibrary() {
+      const grid = document.getElementById('library-grid');
+      grid.innerHTML = '';
+
+      state.playlist.forEach((song, idx) => {
+        const card = document.createElement('div');
+        card.className = 'glass-panel rounded-xl p-4 border border-brand-border flex flex-col justify-between group hover:border-brand-purple/50 transition';
+        card.innerHTML = `
+          <div class="relative w-full h-36 rounded-lg overflow-hidden mb-3">
+            <img src="${song.art}" alt="${song.title}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
+            <button onclick="loadTrack(${idx})" class="absolute bottom-2 right-2 w-10 h-10 rounded-full bg-brand-pink text-white flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition transform hover:scale-110">
+              <i class="fa-solid fa-play ml-0.5"></i>
+            </button>
+          </div>
+          <h4 class="font-bold text-white text-sm truncate">${song.title}</h4>
+          <p class="text-xs text-slate-400 truncate mb-2">${song.artist}</p>
+          <div class="flex items-center justify-between text-[11px] text-slate-500 font-mono">
+            <span>${song.genre.split('/')[0]}</span>
+            <span>${formatTime(song.duration)}</span>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    function handleAudioFileUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const newSong = {
+        id: `upload-${Date.now()}`,
+        title: file.name.replace(/\.[^/.]+$/, ""),
+        artist: 'Local Media Upload (Django Storage)',
+        genre: 'Custom Audio',
+        duration: 180,
+        art: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&auto=format&fit=crop&q=80',
+        type: 'local-upload'
+      };
+
+      state.playlist.unshift(newSong);
+      renderLibrary();
+      showToast(`Uploaded "${newSong.title}" successfully!`, 'success');
+      loadTrack(0);
+    }
+
+    function importYouTubeTrack() {
+      const url = document.getElementById('yt-url-input').value.trim();
+      if (!url) {
+        showToast('Please enter a YouTube video URL', 'error');
+        return;
+      }
+      showToast('YouTube Track Analyzed. Synchronizing IFrame timestamps...', 'success');
+      document.getElementById('yt-url-input').value = '';
+    }
+
+    function queueYouTubeDemo() {
+      showToast('Dispatching synchronized YouTube video play to all 5 devices!', 'success');
+    }
+
+    function updateHardwareLatency(val) {
+      state.hardwareLatencyMs = parseInt(val);
+      const text = `${state.hardwareLatencyMs >= 0 ? '+' : ''}${state.hardwareLatencyMs} ms`;
+      document.getElementById('hw-slider-val').innerText = text;
+      document.getElementById('hw-offset-badge').innerText = text;
+      document.getElementById('debug-hw-delay').innerText = text;
+    }
+
+    function setLatencyPreset(val) {
+      document.getElementById('latency-slider').value = val;
+      updateHardwareLatency(val);
+      showToast(`Applied preset: ${val} ms latency`, 'info');
+    }
+
+    function triggerMetronomeClick() {
+      initWebAudio();
+      if (!audioCtx) return;
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+
+      const now = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+
+      osc.frequency.setValueAtTime(1000, now);
+      gain.gain.setValueAtTime(0.8, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+
+      osc.connect(gain);
+      gain.connect(masterGain);
+      osc.start(now);
+      osc.stop(now + 0.1);
+
+      showToast('🔔 Calibration Click Sounded', 'info');
+    }
+
+    function renderNTPSamples() {
+      const tbody = document.getElementById('ntp-samples-body');
+      tbody.innerHTML = '';
+      state.ntpSamples.forEach(s => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="py-1.5 font-bold">Probe #${s.sample}</td>
+          <td class="py-1.5 text-cyan-400">${s.rtt}</td>
+          <td class="py-1.5 text-purple-300">${s.offset}</td>
+          <td class="py-1.5"><span class="px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/20 text-emerald-400 font-sans">${s.status}</span></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function runNTPCalibration() {
+      showToast('Running high-resolution Cristian NTP burst probe...', 'info');
+      setTimeout(() => {
+        state.estimatedClockOffsetMs = +(Math.random() * 0.4 + 1.1).toFixed(2);
+        document.getElementById('debug-clock-offset').innerText = `+${state.estimatedClockOffsetMs} ms`;
+        document.getElementById('metric-drift').innerText = `+${state.estimatedClockOffsetMs} ms`;
+        showToast(`Clock Calibrated! Offset: +${state.estimatedClockOffsetMs} ms`, 'success');
+      }, 500);
+    }
+
+    function updateSyncPill(text) {
+      document.getElementById('sync-status-text').innerText = text;
+    }
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+      document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('text-white', 'bg-brand-purple/30', 'border', 'border-brand-purple/40');
+        btn.classList.add('text-slate-400');
+      });
+
+      const activeBtn = event.currentTarget;
+      if (activeBtn) {
+        activeBtn.classList.add('text-white', 'bg-brand-purple/30', 'border', 'border-brand-purple/40');
+        activeBtn.classList.remove('text-slate-400');
+      }
+
+      if (tabId === 'player-stage') {
+        renderSpatialStage();
+      }
+    }
+
+    function toggleModal(modalId) {
+      const modal = document.getElementById(modalId);
+      modal.classList.toggle('hidden');
+
+      if (modalId === 'room-modal' && !modal.classList.contains('hidden')) {
+        renderQRCode();
+      }
+    }
+
+    function renderQRCode() {
+      const container = document.getElementById('qrcode-container');
+      container.innerHTML = '';
+      const roomUrl = `${window.location.origin}/room/${state.roomId}`;
+      new QRCode(container, {
+        text: roomUrl,
+        width: 160,
+        height: 160,
+        colorDark: "#0b0d19",
+        colorLight: "#ffffff",
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    }
+
+    function copyRoomLink() {
+      const roomUrl = `${window.location.origin}/room/${state.roomId}`;
+      const tempInput = document.createElement('input');
+      tempInput.value = roomUrl;
+      document.body.appendChild(tempInput);
+      tempInput.select();
+      document.execCommand('copy');
+      document.body.removeChild(tempInput);
+
+      const btn = document.getElementById('copy-link-btn');
+      btn.innerHTML = '<i class="fa-solid fa-check"></i> <span>Copied!</span>';
+      btn.classList.replace('bg-brand-purple', 'bg-emerald-600');
+      setTimeout(() => {
+        btn.innerHTML = '<i class="fa-solid fa-copy"></i> <span>Copy URL</span>';
+        btn.classList.replace('bg-emerald-600', 'bg-brand-purple');
+      }, 2000);
+
+      showToast('Room link copied to clipboard!', 'success');
+    }
+
+    function switchRoomCode() {
+      const input = document.getElementById('join-room-input').value.trim();
+      if (!input) return;
+      state.roomId = input.replace('#', '');
+      document.getElementById('nav-room-id').innerText = `#${state.roomId}`;
+      toggleModal('room-modal');
+      showToast(`Connected to Room #${state.roomId}`, 'success');
+    }
+
+    function showCodeTab(codeId) {
+      document.querySelectorAll('.code-viewport').forEach(el => el.classList.add('hidden'));
+      document.getElementById(codeId).classList.remove('hidden');
+
+      document.querySelectorAll('.code-tab-btn').forEach(btn => {
+        btn.classList.remove('bg-brand-purple', 'text-white');
+        btn.classList.add('bg-slate-800', 'text-slate-300');
+      });
+      event.currentTarget.classList.add('bg-brand-purple', 'text-white');
+      event.currentTarget.classList.remove('bg-slate-800', 'text-slate-300');
+    }
+
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      
+      let border = 'border-brand-purple';
+      let icon = 'fa-circle-info text-brand-pink';
+      if (type === 'success') {
+        border = 'border-emerald-500';
+        icon = 'fa-circle-check text-emerald-400';
+      } else if (type === 'error') {
+        border = 'border-rose-500';
+        icon = 'fa-triangle-exclamation text-rose-400';
+      }
+
+      toast.className = `p-3 rounded-xl bg-slate-900/95 border ${border} text-xs font-semibold text-white shadow-2xl flex items-center space-x-2.5 transform transition-all duration-300 translate-y-2 opacity-0 pointer-events-auto`;
+      toast.innerHTML = `<i class="fa-solid ${icon}"></i> <span>${message}</span>`;
+      container.appendChild(toast);
+
+      setTimeout(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+      }, 10);
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 300);
+      }, 3500);
+    }
+
+    window.onload = function () {
+      renderSpatialStage();
+      renderDevicesList();
+      renderQueue();
+      renderLibrary();
+      renderNTPSamples();
+      startVisualizer();
+      loadTrack(0, false);
+      
+      // Calculate spatial distance for initial device layout
+      state.devices.forEach(calculateSpatialAudio);
+    };
+  </script>
+</body>
+</html>
